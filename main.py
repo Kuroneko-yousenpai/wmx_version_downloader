@@ -121,9 +121,9 @@ def extract_base_url(html_url: str):
     base_url = f"{parsed_url.scheme}://{parsed_url.netloc}{'/'.join(path_parts[:-1])}/"
     return base_url
 
-def download_file(file_url: str, file_path: str, is_critical: bool = True) -> bool:
+def download_file(file_url: str, file_path: str) -> bool:
     response = requests.get(file_url)
-    if response.status_code != 200 and is_critical:
+    if response.status_code != 200:
         print("[-] File not found")
         return False
     base_name = os.path.basename(file_path)
@@ -451,7 +451,7 @@ def main():
         file_url = f"{main_project_url}/{data_f}"
         file_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, data_f))
         is_critical = False
-        is_downloaded = download_file(file_url, file_path, is_critical=is_critical)
+        is_downloaded = download_file(file_url, file_path)
         if not is_downloaded and is_critical:
             break
     print("[+] Done, lol")
