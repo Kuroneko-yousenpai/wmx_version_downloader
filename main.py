@@ -12,6 +12,8 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 import re
+import tkinter as tk
+from tkinter import filedialog
 
 
 def query_yes_no(question, default="yes"):
@@ -29,6 +31,53 @@ def query_yes_no(question, default="yes"):
             return valid[choice]
         else:
             sys.stdout.write("Please respond with 'yes' or 'no' (or 'y'/'n')\n")
+
+def is_ver_url_exists():
+    is_ver_url = query_yes_no("[?] Do you have version folder url?", default="no")
+    return is_ver_url
+
+def get_main_url():
+    while True:
+        loader_url = input("[?] Enter version folder url: ")
+        if re.match(r'^(?:https?://)?(?:www\.)?[\w.-]+\.[a-zA-Z]{2,}(?:/[\w.-]*)*$', loader_url):
+            return loader_url
+        else:
+            print("[-] Invalid link, try again")
+
+def get_main_name():
+    while True:
+        file_name = input("[?] Enter main SWF file name (e.g., Wormix.swf): ").strip()
+        if re.match(r'^[\w,\s-]+\.(swf|SWF)$', file_name):
+            print(f"[+] Main file name for downloading: {file_name}")
+            return file_name
+        else:
+            print("[-] Invalid swwf name. Make sure it ends with \".swf\" and contains no special characters other than \"-\", \"_\", or spaces")
+
+def is_ldr_exists():
+    is_dw_required = query_yes_no("[?] Is preloader needed to be downloaded?", default="yes")
+    return is_dw_required
+
+def get_ldr_path():
+    while True:
+        print("[?] Please select loader file")
+
+        root = tk.Tk()
+        root.withdraw()
+
+        file_path = filedialog.askopenfilename(
+            title="Select preloader.swf file",
+            filetypes=[("SWF files", "*.swf")]
+        )
+
+        if not file_path:
+            print("[-] No file selected. Please choose a .swf file")
+            continue
+
+        if os.path.isfile(file_path) and file_path.lower().endswith(".swf"):
+            print(f"[+] Selected file: {file_path}")
+            return file_path
+        else:
+            print("[-] Invalid file. Please choose a valid .swf file")
 
 def get_ldr_url():
     is_manual = not query_yes_no("[?] Use default VK game loader url?", default="yes")
@@ -205,64 +254,79 @@ def get_lang_pathes(lang_path: str, lang_files: list, lang_folder: str):
 def main():
     print("Wormix Version Downloader v2.0", end="\n\n")
 
-    html_url = get_ldr_url()
+    data_files_c = 0
+    main_folder = "versions"
+    social = ""
+    cur_path = os.getcwd()
+    is_no_ver_url = not is_ver_url_exists()
+    if is_no_ver_url:
+        is_dw_needed = is_ldr_exists()
+        if is_dw_needed:
+            html_url = get_ldr_url()
 
+            print("[+] Try to get new game version...")
+            base_url = extract_base_url(html_url)
+            social_folder = html_url.split("rmart.ru/")[-1].split("/")[0]
+            social = get_social(social_folder)
+            if not base_url or not social_folder:
+                print("[-] Main url are wrong")
+                return
+            response = requests.get(html_url)
+            if response.status_code != 200:
+                print("[-] Failed to fetch HTML content")
+                return
+            soup = BeautifulSoup(response.content, "html.parser")
+            script_tags = soup.find_all("script")
+            loader_name = "preloader.swf"
+            is_downloaded = False
+            for script_tag in script_tags:
+                if script_tag.string:
+                    match = re.search(r"preloader_\d+.swf", script_tag.string)
+                    if match:
+                        loader_name = match.group(0)
+                        swf_url = f"{base_url}{loader_name}"
+                        file_path = os.path.normpath(os.path.join(cur_path, main_folder, loader_name))
+                        is_downloaded = download_file(swf_url, file_path)
+                        break
+            else:
+                print("[-] No preloader files found")
+                return
+            if not is_downloaded:
+                print(f"[-] Loader file {loader_name} not found in folder")
+                return
+            ldr_path = os.path.join(cur_path, main_folder, loader_name)
+        else:
+            ldr_path = get_ldr_path()
+            loader_name = os.path.basename(ldr_path)
+        ldr_decomp_path = decompile_swf(loader_name, ldr_path, cur_path)
+        print("[+] Loader successfully decompiled")
+        print(f"[*] Output path: {ldr_decomp_path}", end="\n\n\n")
+        ldr_results = []
+        loader_patterns = [r'return\s+"(Wormix.*\.swf)";', r'return\s+"(https://.+\.rmart\.ru/.+?)";']
+        for pattern in loader_patterns:
+            results = search_pattern(ldr_decomp_path, pattern)
+            ldr_results.extend([results])
+        main_swf = ""
+        main_project_url = ""
+        for i, res_arr in enumerate(ldr_results):
+            if i == 0:
+                print("[*] Found SWF files:")
+            else:
+                print("\n[*] Found URLs:")
+            for j, res_str in enumerate(res_arr):
+                if i == 0 and j == 0:
+                    main_swf = res_str
+                if i == 1 and j == 0:
+                    main_project_url = res_str
+                print(res_str)
+        if not len(social) > 0 and len(main_project_url) > 0:
+            social_folder = main_project_url.split("rmart.ru/")[-1].split("/")[0]
+            social = get_social(social_folder)
+    else:
+        main_project_url = get_main_url()
+        main_swf = get_main_name()
     game_langs = ["ru", "ua", "en", "all"]
     cur_lang = get_lang(game_langs)
-
-    print("[+] Try to get new game version...")
-    base_url = extract_base_url(html_url)
-    social_folder = html_url.split("rmart.ru/")[-1].split("/")[0]
-    main_folder = "versions"
-    social = get_social(social_folder)
-    if not base_url or not social_folder:
-        print("[-] Main url are wrong")
-        return
-    cur_path = os.getcwd()
-    response = requests.get(html_url)
-    if response.status_code != 200:
-        print("[-] Failed to fetch HTML content")
-        return
-    soup = BeautifulSoup(response.content, "html.parser")
-    script_tags = soup.find_all("script")
-    loader_name = "preloader.swf"
-    for script_tag in script_tags:
-        if script_tag.string:
-            match = re.search(r"preloader_\d+.swf", script_tag.string)
-            if match:
-                loader_name = match.group(0)
-                swf_url = f"{base_url}{loader_name}"
-                file_path = os.path.normpath(os.path.join(cur_path, main_folder, loader_name))
-                is_downloaded = download_file(swf_url, file_path)
-                break
-    else:
-        print("[-] No preloader files found")
-        return
-    if not is_downloaded:
-        print(f"[-] Loader file {loader_name} not found in folder")
-        return
-    ldr_path = os.path.join(cur_path, main_folder, loader_name)
-    ldr_decomp_path = decompile_swf(loader_name, ldr_path, cur_path)
-    print("[+] Loader successfully decompiled")
-    print(f"[*] Output path: {ldr_decomp_path}", end="\n\n\n")
-    ldr_results = []
-    loader_patterns = [r'return\s+"(Wormix.*\.swf)";', r'return\s+"(https://.+\.rmart\.ru/.+?)";']
-    for pattern in loader_patterns:
-        results = search_pattern(ldr_decomp_path, pattern)
-        ldr_results.extend([results])
-    main_swf = ""
-    main_project_url = ""
-    for i, res_arr in enumerate(ldr_results):
-        if i == 0:
-            print("[*] Found SWF files:")
-        else:
-            print("\n[*] Found URLs:")
-        for j, res_str in enumerate(res_arr):
-            if i == 0 and j == 0:
-                main_swf = res_str
-            if i == 1 and j == 0:
-                main_project_url = res_str
-            print(res_str)
     print(f"[*] Warning! Will be downloaded only {main_swf} and used only main url")
     if len(main_swf) < 1 or len(main_project_url) < 1:
         if len(main_swf) < 1:
@@ -287,14 +351,9 @@ def main():
         print("[-] Not all data configs found")
         return
 
-    print(f"[+] Try to download files...", end="\n\n")
-
     ser_file_url = f"{main_project_url}{main_results[0][0]}"
     ser_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[0][0]))
-    is_downloaded = download_file(ser_file_url, ser_path)
-    if not is_downloaded:
-        print("[-] Serializer not found")
-        return
+    data_files_c += 1
 
     cfgs_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[4][0]))
     rescfgs = [main_results[5][0], main_results[6][0], main_results[7][0]]
@@ -327,6 +386,13 @@ def main():
                 break
     main_results = [main_results[i] for i in range(len(main_results)) if i not in rm_indexes]
     del rm_indexes
+
+    data_files_c += len(rescfgs)
+    print(f"[+] Try to download {data_files_c} files...", end="\n\n")
+    is_downloaded = download_file(ser_file_url, ser_path)
+    if not is_downloaded:
+        print("[-] Serializer not found")
+        return
     for rescfg_file in rescfgs:
         resconfig_url = f"{main_project_url}{main_results[4][0]}{rescfg_file}"
         rescfg_path = os.path.normpath(os.path.join(cfgs_path, rescfg_file))
@@ -336,6 +402,7 @@ def main():
             return
         data_files = extract_data_files(rescfg_path)
         all_data_files.extend(data_files)
+    data_files_c = 0
 
     # Get real pathes
     for i, file_path in enumerate(all_data_files):
@@ -377,7 +444,9 @@ def main():
             other_lang_paths = get_lang_pathes(main_results[3][0], other_lang_files, lang)
             lang_paths.extend(other_lang_paths)
             all_data_files.extend(lang_paths)
+    data_files_c += len(all_data_files)
 
+    print(f"\n[+] Try to download remaining {data_files_c} files...", end="\n\n")
     for i, data_f in enumerate(all_data_files):
         file_url = f"{main_project_url}/{data_f}"
         file_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, data_f))
@@ -390,4 +459,5 @@ def main():
 
 if __name__ == "__main__":
     # Default link to main VK game loader: https://markus.rmart.ru/engine/preloader/preloader.html
+    # Default link to main VK game version: https://markus.rmart.ru/engine/1.60.0/
     main()
