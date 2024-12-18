@@ -8,12 +8,14 @@
 import os
 import subprocess
 import sys
+import time
 from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 import re
 import tkinter as tk
 from tkinter import filedialog
+from utils.wmx_merger import get_valid_filename, copy_contents_to_file, create_file_tree, convert_size
 
 
 def query_yes_no(question, default="yes"):
@@ -33,7 +35,7 @@ def query_yes_no(question, default="yes"):
             sys.stdout.write("Please respond with 'yes' or 'no' (or 'y'/'n')\n")
 
 def is_ver_url_exists():
-    is_ver_url = query_yes_no("[?] Do you have version folder url?", default="no")
+    is_ver_url = query_yes_no("[?] Do you have game version folder url?", default="no")
     return is_ver_url
 
 def get_main_url():
@@ -90,6 +92,14 @@ def get_ldr_url():
             return loader_url
         else:
             print("[-] Invalid link, try again")
+
+def is_data_exists():
+    is_data_required = query_yes_no("[?] Is data need to be downloaded?", default="yes")
+    return is_data_required
+
+def is_need_export():
+    is_export_required = query_yes_no("[?] Is single txt export needed?", default="no")
+    return is_export_required
 
 def get_lang(langs: list):
     is_manual = not query_yes_no("[?] Use default game lang?", default="yes")
@@ -251,8 +261,26 @@ def get_lang_pathes(lang_path: str, lang_files: list, lang_folder: str):
         files.append(lang_f_path)
     return files
 
+def make_single_file(folder_path: str, output_path: str):
+    output_file_name = get_valid_filename("[?] Enter the name for the result file: ")
+    is_rm_imports = query_yes_no("[?] Remove imports lines?", default="yes")
+    is_include_names = query_yes_no("[?] Include file names in the content?", default="no")
+    result_file_path = os.path.join(output_path, output_file_name)
+    time_start = time.time()
+    with open(result_file_path, "w") as res_file:
+        copy_contents_to_file(folder_path, res_file, is_include_names, is_rm_imports)
+    time_end = time.time()
+    execution_time = time_end - time_start
+    is_tree_need = query_yes_no("[?] Make filetree?", default="no")
+    if is_tree_need:
+        file_tree = create_file_tree(folder_path)
+        print(f"\n[+] File Tree:\n{file_tree}")
+    file_size = convert_size(os.path.getsize(result_file_path))
+    print(f"[*] Result path: {result_file_path} ; Size: {file_size}")
+    print(f"[*] Successed in: {execution_time}")
+
 def main():
-    print("Wormix Version Downloader v2.0", end="\n\n")
+    print("Wormix Version Downloader v2.1", end="\n\n")
 
     data_files_c = 0
     main_folder = "versions"
@@ -325,8 +353,6 @@ def main():
     else:
         main_project_url = get_main_url()
         main_swf = get_main_name()
-    game_langs = ["ru", "ua", "en", "all"]
-    cur_lang = get_lang(game_langs)
     print(f"[*] Warning! Will be downloaded only {main_swf} and used only main url")
     if len(main_swf) < 1 or len(main_project_url) < 1:
         if len(main_swf) < 1:
@@ -341,11 +367,30 @@ def main():
     if not is_downloaded:
         print(f"[-] Main swf file {main_swf_url} not found in folder")
         return
+    is_need_dw_data = is_data_exists()
+    is_export_required = False
+    if not is_need_dw_data:
+        is_export_required = is_need_export()
+        if not is_export_required:
+            print("[+] Done, lol")
+            return
     main_swf_path = os.path.join(cur_path, main_folder, project_version, main_swf)
     main_decomp_path = decompile_swf(main_swf, main_swf_path, cur_path)
     print("[+] Main game engine swf successfully decompiled")
     print(f"[*] Output path: {main_decomp_path}", end="\n\n\n")
 
+    if not is_need_dw_data:
+        if is_export_required:
+            res_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version))
+            make_single_file(main_decomp_path, res_path)
+        print("[+] Done, lol")
+        return
+    is_export_required = is_need_export()
+    if is_export_required:
+        res_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version))
+        make_single_file(main_decomp_path, res_path)
+    game_langs = ["ru", "ua", "en", "all"]
+    cur_lang = get_lang(game_langs)
     main_results = search_main_patterns(main_decomp_path)
     if len(main_results) < 9:
         print("[-] Not all data configs found")
@@ -388,7 +433,7 @@ def main():
     del rm_indexes
 
     data_files_c += len(rescfgs)
-    print(f"[+] Try to download {data_files_c} files...", end="\n\n")
+    print(f"\n[+] Try to download {data_files_c} files...", end="\n\n")
     is_downloaded = download_file(ser_file_url, ser_path)
     if not is_downloaded:
         print("[-] Serializer not found")
