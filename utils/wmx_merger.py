@@ -13,8 +13,18 @@ def check_imports(str_l: str):
     pattern = re.compile(r'^\s*import\s+.*;', re.MULTILINE)
     return bool(pattern.match(str_l))
 
-def copy_contents_to_file(start_path, output_file, is_include_names: bool = False, is_rm_imports: bool = False):
+def copy_contents_to_file(start_path, output_file, is_include_names: bool = False, is_rm_imports: bool = False, sort_by="name"):
     all_files = [os.path.join(root, file) for root, dirs, files in os.walk(start_path) for file in files if file.endswith('.as')]
+
+    if sort_by == "name":
+        all_files.sort(key=lambda x: os.path.basename(x).lower())
+    elif sort_by == "size":
+        all_files.sort(key=lambda x: os.path.getsize(x))
+    elif sort_by == "date":
+        all_files.sort(key=lambda x: os.path.getmtime(x))
+    elif sort_by == "type":
+        all_files.sort(key=lambda x: os.path.splitext(x)[1].lower())
+
     is_first_file = True
     for file_path in all_files:
         file_buffer = []
