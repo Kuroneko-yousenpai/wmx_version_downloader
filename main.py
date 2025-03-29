@@ -442,7 +442,7 @@ def main():
     ser_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[0][0]))
     data_files_c += 1
 
-    cfgs_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[4][0]))
+    cfgs_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[3][0]))
     rescfgs_targets = {"resconfig.xml", "bosses_config.xml", "battle_stuff_config.xml"}
     rcfgs_indexes = []
     for target in rescfgs_targets:
