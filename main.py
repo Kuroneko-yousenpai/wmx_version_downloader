@@ -1,11 +1,12 @@
 """
-  - Copyright 2024 Ruri Gokou (Kuroneko-yousenpai)
+  - Copyright 2024 Mika Hyakuya (Kuroneko-yousenpai)
   - Email: Kuronekoyousenpai@gmail.com
   - Telegram: https://t.me/Kuroneko_yousenpai
   - VK: https://vk.com/kuroneko_yousenpai
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -41,7 +42,7 @@ def is_ver_url_exists():
 def get_main_url():
     while True:
         loader_url = input("[?] Enter version folder url: ")
-        if re.match(r'^(?:https?://)?(?:www\.)?[\w.-]+\.[a-zA-Z]{2,}(?:/[\w.-]*)*$', loader_url):
+        if re.match(r'^(?:https?://)?(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\w[\w.-]+\.[a-zA-Z]{2,})(?:/[\w.-]*)*$', loader_url):
             return loader_url
         else:
             print("[-] Invalid link, try again")
@@ -88,7 +89,7 @@ def get_ldr_url():
         return loader_url
     while True:
         loader_url = input("[?] Enter preloader url: ")
-        if re.match(r'^(?:https?://)?(?:www\.)?[\w.-]+\.[a-zA-Z]{2,}(?:/[\w.-]*)*$', loader_url):
+        if re.match(r'^(?:https?://)?(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|\w[\w.-]+\.[a-zA-Z]{2,})(?:/[\w.-]*)*$', loader_url):
             return loader_url
         else:
             print("[-] Invalid link, try again")
@@ -134,7 +135,7 @@ def extract_base_url(html_url: str):
 def download_file(file_url: str, file_path: str) -> bool:
     response = requests.get(file_url)
     if response.status_code != 200:
-        print("[-] File not found")
+        print(f"[-] File not found: {file_url}")
         return False
     base_name = os.path.basename(file_path)
     base_path = os.path.dirname(file_path)
@@ -145,13 +146,27 @@ def download_file(file_url: str, file_path: str) -> bool:
     print(f"[+] File {base_name} successfully downloaded")
     return True
 
+def is_need_redecompile():
+    is_redec_required = query_yes_no("[?] Founded decompiled output folder. Is need to decompile again?", default="yes")
+    return is_redec_required
+
 def decompile_swf(file_name: str, swf_path: str, cur_path: str) -> str:
     jar_path = os.path.normpath(os.path.join(cur_path, "ffdec/ffdec.jar"))
     if file_name.find(".") != -1:
         file_name = file_name.split(".")[0]
     output_dir = os.path.join(os.getenv("LOCALAPPDATA"), "Temp", "swf_export", file_name)
 
-    if not os.path.exists(output_dir):
+    if os.path.exists(output_dir):
+        is_need_redec = is_need_redecompile()
+        if not is_need_redec:
+            return output_dir
+        for filename in os.listdir(output_dir):
+            file_path = os.path.join(output_dir, filename)
+            if os.path.isfile(file_path) or os.path.islink(file_path):
+                os.unlink(file_path)
+            elif os.path.isdir(file_path):
+                shutil.rmtree(file_path)
+    else:
         os.makedirs(output_dir)
 
     command = f"java -jar {jar_path} -export script {output_dir} {swf_path}"
@@ -257,7 +272,7 @@ def get_lang_pathes(lang_path: str, lang_files: list, lang_folder: str):
     files = []
     for lang_f in lang_files:
         lang_f = f"{lang_f}_{lang_folder}.xml"
-        lang_f_path = os.path.join(lang_path, lang_f)
+        lang_f_path = f"{lang_path}/{lang_f}"
         files.append(lang_f_path)
     return files
 
@@ -279,8 +294,26 @@ def make_single_file(folder_path: str, output_path: str):
     print(f"[*] Result path: {result_file_path} ; Size: {file_size}")
     print(f"[*] Successed in: {execution_time}")
 
+
+def remove_duplicates(arr: list):
+    unique_list = []
+
+    for item in arr:
+        if item not in unique_list:
+            unique_list.append(item)
+
+    return unique_list
+
+def is_ldr_need_redw():
+    is_dw_required = query_yes_no("[?] Loader file found. Is need to download new?", default="yes")
+    return is_dw_required
+
+def is_main_need_redw():
+    is_dw_required = query_yes_no("[?] Main file found. Is need to download new?", default="yes")
+    return is_dw_required
+
 def main():
-    print("Wormix Version Downloader v2.1", end="\n\n")
+    print("Wormix Version Downloader v2.3", end="\n\n")
 
     data_files_c = 0
     main_folder = "versions"
@@ -299,30 +332,34 @@ def main():
             if not base_url or not social_folder:
                 print("[-] Main url are wrong")
                 return
-            response = requests.get(html_url)
-            if response.status_code != 200:
-                print("[-] Failed to fetch HTML content")
-                return
-            soup = BeautifulSoup(response.content, "html.parser")
-            script_tags = soup.find_all("script")
             loader_name = "preloader.swf"
-            is_downloaded = False
-            for script_tag in script_tags:
-                if script_tag.string:
-                    match = re.search(r"preloader_\d+.swf", script_tag.string)
-                    if match:
-                        loader_name = match.group(0)
-                        swf_url = f"{base_url}{loader_name}"
-                        file_path = os.path.normpath(os.path.join(cur_path, main_folder, loader_name))
-                        is_downloaded = download_file(swf_url, file_path)
-                        break
-            else:
-                print("[-] No preloader files found")
-                return
-            if not is_downloaded:
-                print(f"[-] Loader file {loader_name} not found in folder")
-                return
-            ldr_path = os.path.join(cur_path, main_folder, loader_name)
+            ldr_path = os.path.normpath(os.path.join(cur_path, main_folder, loader_name))
+            is_ldr_need_dw = True
+            if os.path.isfile(ldr_path):
+                is_ldr_need_dw = is_ldr_need_redw()
+            if is_ldr_need_dw:
+                response = requests.get(html_url)
+                if response.status_code != 200:
+                    print("[-] Failed to fetch HTML content")
+                    return
+                soup = BeautifulSoup(response.content, "html.parser")
+                script_tags = soup.find_all("script")
+                is_downloaded = False
+                for script_tag in script_tags:
+                    if script_tag.string:
+                        match = re.search(r"preloader_\d+.swf", script_tag.string)
+                        if match:
+                            loader_name = match.group(0)
+                            swf_url = f"{base_url}{loader_name}"
+                            ldr_path = os.path.normpath(os.path.join(cur_path, main_folder, loader_name))
+                            is_downloaded = download_file(swf_url, ldr_path)
+                            break
+                else:
+                    print("[-] No preloader files found")
+                    return
+                if not is_downloaded:
+                    print(f"[-] Loader file {loader_name} not found in folder")
+                    return
         else:
             ldr_path = get_ldr_path()
             loader_name = os.path.basename(ldr_path)
@@ -363,10 +400,14 @@ def main():
     project_version = re.search(r"/([\w.]+)/$", main_project_url).group(1)
     main_swf_url = f"{main_project_url}{main_swf}"
     file_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_swf))
-    is_downloaded = download_file(main_swf_url, file_path)
-    if not is_downloaded:
-        print(f"[-] Main swf file {main_swf_url} not found in folder")
-        return
+    is_main_need_dw = True
+    if os.path.isfile(file_path):
+        is_main_need_dw = is_main_need_redw()
+    if is_main_need_dw:
+        is_downloaded = download_file(main_swf_url, file_path)
+        if not is_downloaded:
+            print(f"[-] Main swf file {main_swf_url} not found in folder")
+            return
     is_need_dw_data = is_data_exists()
     is_export_required = False
     if not is_need_dw_data:
@@ -396,12 +437,27 @@ def main():
         print("[-] Not all data configs found")
         return
 
+    main_results = remove_duplicates(main_results)
     ser_file_url = f"{main_project_url}{main_results[0][0]}"
     ser_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[0][0]))
     data_files_c += 1
 
     cfgs_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[4][0]))
-    rescfgs = [main_results[5][0], main_results[6][0], main_results[7][0]]
+    rescfgs_targets = {"resconfig.xml", "bosses_config.xml", "battle_stuff_config.xml"}
+    rcfgs_indexes = []
+    for target in rescfgs_targets:
+        is_found = False
+        for i, sublist in enumerate(main_results):
+            if (isinstance(sublist, list) and len(sublist) == 1 and
+                    isinstance(sublist[0], str) and sublist[0] == target):
+                rcfgs_indexes.append(i)
+                is_found = True
+                break
+        if not is_found:
+            print(f"[!] Config not found: {target}")
+    rescfgs = []
+    for i in rcfgs_indexes:
+        rescfgs.append(main_results[i][0])
     all_data_files = []
     other_lang_files = []
     rm_indexes = []
@@ -439,7 +495,7 @@ def main():
         print("[-] Serializer not found")
         return
     for rescfg_file in rescfgs:
-        resconfig_url = f"{main_project_url}{main_results[4][0]}{rescfg_file}"
+        resconfig_url = f"{main_project_url}{main_results[3][0]}{rescfg_file}"
         rescfg_path = os.path.normpath(os.path.join(cfgs_path, rescfg_file))
         is_downloaded = download_file(resconfig_url, rescfg_path)
         if not is_downloaded:
@@ -463,30 +519,31 @@ def main():
                 break
     slang_files = [all_data_files.pop(i) for i in sorted(lang_indexes, reverse=True)]
 
+    # Get lang files
     if cur_lang != -1:
-        lang_paths = get_lang_pathes(main_results[3][0], main_results[-1][0], game_langs[cur_lang])
+        lang_paths = get_lang_pathes(f"{main_results[1][0]}lang", main_results[-1][0], game_langs[cur_lang])
         all_data_files.extend(lang_paths)
         for slang in slang_files:
             lang_f = f"{slang}_{game_langs[cur_lang]}.xml"
             all_data_files.append(lang_f)
-        other_lang_paths = get_lang_pathes(main_results[3][0], other_lang_files, game_langs[cur_lang])
+        other_lang_paths = get_lang_pathes(f"{main_results[1][0]}lang", other_lang_files, game_langs[cur_lang])
         lang_paths.extend(other_lang_paths)
         # For lang/chat we need at least ru, ua or en lang files
         chat_index = other_lang_files.index("chat")
         for lang in game_langs[:-1]:
             if lang == game_langs[cur_lang]:
                 continue
-            c_lang_paths = get_lang_pathes(main_results[3][0], [other_lang_files[chat_index]], lang)
+            c_lang_paths = get_lang_pathes(f"{main_results[1][0]}lang", [other_lang_files[chat_index]], lang)
             lang_paths.extend(c_lang_paths)
         all_data_files.extend(lang_paths)
     else:
         for lang in game_langs[:-1]:
-            lang_paths = get_lang_pathes(main_results[3][0], main_results[-1][0], lang)
+            lang_paths = get_lang_pathes(f"{main_results[1][0]}lang", main_results[-1][0], lang)
             all_data_files.extend(lang_paths)
             for slang in slang_files:
                 lang_f = f"{slang}_{lang}.xml"
                 all_data_files.append(lang_f)
-            other_lang_paths = get_lang_pathes(main_results[3][0], other_lang_files, lang)
+            other_lang_paths = get_lang_pathes(f"{main_results[1][0]}lang", other_lang_files, lang)
             lang_paths.extend(other_lang_paths)
             all_data_files.extend(lang_paths)
     data_files_c += len(all_data_files)
