@@ -384,13 +384,13 @@ def main():
                 if i == 1 and j == 0:
                     main_project_url = res_str
                 print(res_str)
-        if not len(social) > 0 and len(main_project_url) > 0:
-            social_folder = main_project_url.split("rmart.ru/")[-1].split("/")[0]
-            social = get_social(social_folder)
     else:
         main_project_url = get_main_url()
         main_swf = get_main_name()
-    print(f"[*] Warning! Will be downloaded only {main_swf} and used only main url")
+    if not len(social) > 0 and len(main_project_url) > 0:
+        social_folder = main_project_url.split("rmart.ru/")[-1].split("/")[0]
+        social = get_social(social_folder)
+    print(f"[*] Warning! Will be downloaded only {main_swf} and used only main url will be used")
     if len(main_swf) < 1 or len(main_project_url) < 1:
         if len(main_swf) < 1:
             print("[-] Main swf file not found")
@@ -442,7 +442,8 @@ def main():
     ser_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[0][0]))
     data_files_c += 1
 
-    cfgs_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, main_results[3][0]))
+    rescfg_dir = "data/resconfigs/"
+    cfgs_path = os.path.normpath(os.path.join(cur_path, main_folder, project_version, rescfg_dir))
     rescfgs_targets = {"resconfig.xml", "bosses_config.xml", "battle_stuff_config.xml"}
     rcfgs_indexes = []
     for target in rescfgs_targets:
@@ -495,7 +496,7 @@ def main():
         print("[-] Serializer not found")
         return
     for rescfg_file in rescfgs:
-        resconfig_url = f"{main_project_url}{main_results[3][0]}{rescfg_file}"
+        resconfig_url = f"{main_project_url}{rescfg_dir}{rescfg_file}"
         rescfg_path = os.path.normpath(os.path.join(cfgs_path, rescfg_file))
         is_downloaded = download_file(resconfig_url, rescfg_path)
         if not is_downloaded:
