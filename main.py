@@ -85,7 +85,7 @@ def get_ldr_path():
 def get_ldr_url():
     is_manual = not query_yes_no("[?] Use default VK game loader url?", default="yes")
     if not is_manual:
-        loader_url = "https://markus.rmart.ru/engine/preloader/preloader.html"
+        loader_url = "https://tesla.rmart.ru/engine/preloader/preloader.html"
         return loader_url
     while True:
         loader_url = input("[?] Enter preloader url: ")
@@ -108,7 +108,7 @@ def get_lang(langs: list):
         cur_lang = 0
         return cur_lang
 
-    print("[+] Choose game lang")
+    print("[*] Choose game lang")
     for i, lang in enumerate(langs, start=1):
         print(f"{i} - {lang}")
 
@@ -196,7 +196,7 @@ def search_main_patterns(folder_path):
     chat2_pattern = re.compile(r'\+ "chat_"')
 
     founded_arr = []
-    const_pattern = re.compile(r'private\s+static\s+const\s+\S+\s*:\s*(String|Array)\s*=\s*("[^"]+"|\[[^\]]+\])') # noqa
+    const_pattern = re.compile(r'private\s+static\s+const\s+([^\n:]+?)\s*:\s*(String|Array)\s*=\s*("[^"]+"|\[[^\]]+\])') # noqa
     results = []
     is_data_found = False
     is_ser_found = False
@@ -208,10 +208,10 @@ def search_main_patterns(folder_path):
                     if data_pattern.search(content):
                         const_matches = const_pattern.findall(content)
                         for match in const_matches:
-                            if match[1].startswith('"'):
-                                founded_arr.append(match[1][1:-1])
+                            if match[2].startswith('"'):
+                                founded_arr.append(match[2][1:-1])
                             else:
-                                array_items = [item.strip()[1:-1] for item in match[1][1:-1].split(",")]
+                                array_items = [item.strip()[1:-1] for item in match[2][1:-1].split(",")]
                                 founded_arr.append(array_items)
                         chat_matches = chat_pattern.findall(content)
                         founded_arr.append(chat_matches[0])
@@ -313,7 +313,7 @@ def is_main_need_redw():
     return is_dw_required
 
 def main():
-    print("Wormix Version Downloader v2.3", end="\n\n")
+    print("Wormix Version Downloader v2.4", end="\n\n")
 
     data_files_c = 0
     main_folder = "versions"
@@ -561,6 +561,6 @@ def main():
 
 
 if __name__ == "__main__":
-    # Default link to main VK game loader: https://markus.rmart.ru/engine/preloader/preloader.html
-    # Default link to main VK game version: https://markus.rmart.ru/engine/1.60.0/
+    # Default link to main VK game loader: https://tesla.rmart.ru/engine/preloader/preloader.html
+    # Default link to main VK game version: https://tesla.rmart.ru/engine/1.60.0/
     main()
