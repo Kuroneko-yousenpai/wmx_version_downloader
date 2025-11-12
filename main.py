@@ -1,8 +1,8 @@
 """
   - Copyright 2024 Mika Hyakuya (Kuroneko-yousenpai)
   - Email: Kuronekoyousenpai@gmail.com
-  - Telegram: https://t.me/Kuroneko_yousenpai
-  - VK: https://vk.com/kuroneko_yousenpai
+  - Telegram: https://t.me/Hyakuya_yousenpai
+  - VK: https://vk.com/Hyakuya_yousenpai
 """
 
 import os
